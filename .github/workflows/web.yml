@@ -33,11 +33,17 @@ jobs:
           # include the cargo bin dir so 'trunk' install is cached too
           cache-targets: true
 
-      - name: Install cargo-binstall
-        run: cargo install cargo-binstall
+      - name: Cache cargo bin
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-v1
       
-      - name: Install trunk (with prebuilt binary)
-        run: cargo binstall --no-confirm trunk
+      - name: Install trunk if missing
+        run: |
+          if ! command -v trunk >/dev/null; then
+            cargo install trunk
+          fi
 
       - name: Build with trunk
         env:
