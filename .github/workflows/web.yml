@@ -42,11 +42,14 @@ jobs:
       - name: Build with trunk
         env:
           PUBLIC_URL: "/${{ github.event.repository.name }}/"
-        run: |
-          trunk build --release --public-url "$PUBLIC_URL"
+        working-directory: thinkdsp
+        run: trunk build --release
 
-      # (Optional) custom domain: create CNAME file before upload
-      # - run: echo "example.com" > dist/CNAME
+     # Stage the root redirect page at dist/index.html
+      - name: Prepare root index
+        run: |
+          mkdir -p dist
+          cp index.html dist/index.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
