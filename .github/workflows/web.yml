@@ -33,11 +33,10 @@ jobs:
           # include the cargo bin dir so 'trunk' install is cached too
           cache-targets: true
 
-      - name: Install trunk
-        run: |
-          if ! command -v trunk >/dev/null; then
-            cargo install trunk
-          fi
+      - name: Install trunk (prebuilt binary)
+        uses: dtolnay/install@cargo-binstall
+        with:
+          crate: trunk
 
       - name: Build with trunk
         env:
