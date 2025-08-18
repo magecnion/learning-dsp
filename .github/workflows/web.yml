@@ -1,0 +1,73 @@
+name: Deploy with trunk to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# Required for GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (stable) + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          # include the cargo bin dir so 'trunk' install is cached too
+          cache-targets: true
+
+      - name: Cache cargo bin
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-v1
+
+      - name: Install trunk if missing
+        run: |
+          if ! command -v trunk >/dev/null; then
+            cargo install trunk
+          fi
+
+      - name: Build with trunk
+        env:
+          PUBLIC_URL: "/${{ github.event.repository.name }}/"
+        working-directory: thinkdsp
+        run: trunk build --release
+
+     # Stage the root redirect page at dist/index.html
+      - name: Prepare root index
+        run: |
+          mkdir -p dist
+          cp index.html dist/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

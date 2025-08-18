@@ -13,8 +13,7 @@ impl eframe::App for MyPlot {
             Plot::new("My Plot")
                 .legend(Legend::default())
                 .show(ui, |plot_ui| {
-                    plot_ui
-                        .line(Line::new("curve", PlotPoints::Borrowed(&self.points)).name("curve"));
+                    plot_ui.line(Line::new("sin", PlotPoints::Borrowed(&self.points)).name("sin"));
                 });
         });
     }
