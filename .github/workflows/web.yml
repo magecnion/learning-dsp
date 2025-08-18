@@ -2,7 +2,7 @@ name: Deploy with trunk to GitHub Pages
 
 on:
   push:
-    branches: [ "main", "feature/serve-modules-as-webpage" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 # Required for GitHub Pages
@@ -38,7 +38,7 @@ jobs:
         with:
           path: ~/.cargo/bin
           key: ${{ runner.os }}-cargo-bin-v1
-      
+
       - name: Install trunk if missing
         run: |
           if ! command -v trunk >/dev/null; then
