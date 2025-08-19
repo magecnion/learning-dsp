@@ -1,10 +1,10 @@
+use eframe::egui;
 use egui_plot::{Legend, Line, Plot, PlotPoint, PlotPoints};
 use std::time::Duration;
-use thinkdsp::Sinusoid;
 
 #[derive(Default)]
 struct MyPlot {
-    points: Vec<PlotPoint>,
+    plot_points: Vec<PlotPoint>,
 }
 
 impl eframe::App for MyPlot {
@@ -13,24 +13,38 @@ impl eframe::App for MyPlot {
             Plot::new("My Plot")
                 .legend(Legend::default())
                 .show(ui, |plot_ui| {
-                    plot_ui.line(Line::new("sin", PlotPoints::Borrowed(&self.points)).name("sin"));
+                    plot_ui.line(
+                        Line::new("sin", PlotPoints::Borrowed(&self.plot_points)).name("sin"),
+                    );
                 });
         });
     }
 }
 
-// When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
-fn main() {
+pub fn render() {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     log::info!("Starting native…");
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([350.0, 200.0]),
+        ..Default::default()
+    };
+
+    if let Err(e) = eframe::run_native(
+        "My egui App with a plot",
+        options,
+        Box::new(|_cc| Ok(Box::<MyPlot>::default())),
+    ) {
+        println!("Error rendering native: {e}");
+        std::process::exit(1);
+    }
 }
 
 // TODO move all code related to gui to another module, add input
-
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]
-fn main() {
+pub fn render() {
     use eframe::wasm_bindgen::JsCast as _;
 
     // Enable logs to the browser console:
@@ -38,7 +52,31 @@ fn main() {
 
     let web_options = eframe::WebOptions::default();
 
-    wasm_bindgen_futures::spawn_local(async {
+    let sinusoid_signal = Sinusoid::new(440.0, 1.0, 0.0, f64::sin);
+
+    let x_times = vec![
+        Duration::from_secs_f64(0.0),
+        Duration::from_secs_f64(0.25),
+        Duration::from_secs_f64(0.5),
+        Duration::from_secs_f64(0.75),
+    ];
+    let y_air_pressures = sinusoid_signal.evaluate(&x_times);
+    wasm_bindgen_futures::spawn_local(async move {
+        // gui
+
+        let mut plot_points: Vec<PlotPoint> = Vec::with_capacity(x_times.len());
+
+        for i in 0..x_times.len() {
+            let x = x_times[i].as_secs_f64();
+            let y = y_air_pressures[i];
+            plot_points.push(PlotPoint::new(x, y));
+        }
+        // TODO use proper logging
+        web_sys::console::log_1(&eframe::wasm_bindgen::JsValue::from_str(&format!(
+            "{:?}",
+            plot_points
+        )));
+
         let document = web_sys::window()
             .expect("No window")
             .document()
@@ -50,34 +88,11 @@ fn main() {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .expect("the_canvas_id was not a HtmlCanvasElement");
 
-        let sinusoid_signal = Sinusoid::new(440.0, 1.0, 0.0, f64::sin);
-
-        let x_times = vec![
-            Duration::from_secs_f64(0.0),
-            Duration::from_secs_f64(0.25),
-            Duration::from_secs_f64(0.5),
-            Duration::from_secs_f64(0.75),
-        ];
-        let y_air_pressure = sinusoid_signal.evaluate(&x_times);
-
-        let mut points: Vec<PlotPoint> = Vec::with_capacity(x_times.len());
-
-        for i in 0..x_times.len() {
-            let x = x_times[i].as_secs_f64();
-            let y = y_air_pressure[i];
-            points.push(PlotPoint::new(x, y));
-        }
-        // TODO use proper logging
-        web_sys::console::log_1(&eframe::wasm_bindgen::JsValue::from_str(&format!(
-            "{:?}",
-            points
-        )));
-
         let start_result = eframe::WebRunner::new()
             .start(
                 canvas,
                 web_options,
-                Box::new(|_| Ok(Box::new(MyPlot { points }))),
+                Box::new(|_| Ok(Box::new(MyPlot { plot_points }))),
             )
             .await;
 
