@@ -33,6 +33,8 @@ pub trait Signal {
         .plot();
     }
 
+    fn period(&self) -> time::Duration;
+
     fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
         let samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
         let times: Vec<Duration> = (0..samples)
@@ -66,6 +68,10 @@ impl Signal for Sinusoid {
             })
             .collect()
     }
+
+    fn period(&self) -> time::Duration {
+        Duration::from_secs_f64(1.0 / self.freq)
+    }
 }
 
 type Sample = f64;
@@ -78,10 +84,6 @@ impl Sinusoid {
             offset,
             func,
         }
-    }
-
-    fn period(&self) -> time::Duration {
-        Duration::from_secs_f64(1.0 / self.freq)
     }
 }
 
@@ -96,6 +98,10 @@ impl Signal for SumSinusoid {
             .zip(samples_b.into_iter())
             .map(|(a, b)| a + b)
             .collect()
+    }
+
+    fn period(&self) -> time::Duration {
+        self.0.period().max(self.1.period())
     }
 }
 
