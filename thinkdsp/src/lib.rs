@@ -7,7 +7,7 @@ use std::{
 
 pub struct Wave {
     times: Vec<Duration>,
-    samples: Vec<AirPressure>, // TODO replace AirPressure by sample
+    samples: Vec<Sample>,
     pub framerate: u64,
 }
 
@@ -22,17 +22,21 @@ impl Wave {
 }
 
 pub trait Signal {
-    fn evaluate(&self, ts: &Vec<time::Duration>) -> Vec<AirPressure>;
+    fn evaluate(&self, ts: &Vec<time::Duration>) -> Vec<Sample>;
 
     fn plot(&self, framerate: u64) {
-        self.make_wave(0.0, 0.0, framerate).plot();
+        self.make_wave(
+            Duration::from_secs_f64(0.0),
+            Duration::from_secs_f64(0.0),
+            framerate,
+        )
+        .plot();
     }
 
-    // TODO use Duration instead of f64
-    fn make_wave(&self, duration: f64, start: f64, framerate: u64) -> Wave {
-        let samples = (duration * framerate as f64).round() as usize;
+    fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
+        let samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
         let times: Vec<Duration> = (0..samples)
-            .map(|i| Duration::from_secs_f64(start + i as f64 / framerate as f64))
+            .map(|i| Duration::from_secs_f64(start.as_secs_f64() + i as f64 / framerate as f64)) // TODO this is weird, refactor
             .collect();
         let samples = self.evaluate(&times);
 
@@ -53,7 +57,7 @@ pub struct Sinusoid {
 }
 
 impl Signal for Sinusoid {
-    fn evaluate(&self, times: &Vec<time::Duration>) -> Vec<AirPressure> {
+    fn evaluate(&self, times: &Vec<time::Duration>) -> Vec<Sample> {
         times
             .iter()
             .map(|&t| {
@@ -64,7 +68,7 @@ impl Signal for Sinusoid {
     }
 }
 
-type AirPressure = f64;
+type Sample = f64;
 
 impl Sinusoid {
     fn new(freq: f64, amp: f64, offset: f64, func: fn(f64) -> f64) -> Sinusoid {
@@ -84,7 +88,7 @@ impl Sinusoid {
 // duda: no tiene sentido SumSignal no? porque solo se suman sinusoid
 pub struct SumSinusoid(Sinusoid, Sinusoid);
 impl Signal for SumSinusoid {
-    fn evaluate(&self, times: &Vec<time::Duration>) -> Vec<AirPressure> {
+    fn evaluate(&self, times: &Vec<time::Duration>) -> Vec<Sample> {
         let samples_a = self.0.evaluate(times);
         let samples_b = self.1.evaluate(times);
         samples_a

@@ -2,6 +2,9 @@ use eframe::egui;
 use egui_plot::{Legend, Line, Plot, PlotPoint, PlotPoints};
 use std::time::Duration;
 
+// TODO: render in the browser with WASM
+// start from this removed code: https://github.com/magecnion/learning-dsp/commit/655f0b178502eb2562586b8713653eaa0082a192
+
 #[derive(Default)]
 struct MyPlot {
     plot_points: Vec<PlotPoint>,
