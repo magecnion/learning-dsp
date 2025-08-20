@@ -1,4 +1,0 @@
-[build]
-dist = "../dist/thinkdsp"
-
-public_url = "/learning-dsp/thinkdsp/"
