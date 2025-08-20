@@ -21,8 +21,7 @@ impl eframe::App for MyPlot {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub fn render() {
+pub fn render(times: Vec<Duration>, samples: Vec<f64>) {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     log::info!("Starting native…");
 
@@ -31,84 +30,19 @@ pub fn render() {
         ..Default::default()
     };
 
+    let mut plot_points: Vec<PlotPoint> = Vec::with_capacity(times.len());
+    for i in 0..times.len() {
+        let x = times[i].as_secs_f64();
+        let y = samples[i];
+        plot_points.push(PlotPoint::new(x, y));
+    }
+
     if let Err(e) = eframe::run_native(
         "My egui App with a plot",
         options,
-        Box::new(|_cc| Ok(Box::<MyPlot>::default())),
+        Box::new(|_cc| Ok(Box::new(MyPlot { plot_points }))),
     ) {
         println!("Error rendering native: {e}");
         std::process::exit(1);
     }
-}
-
-// TODO move all code related to gui to another module, add input
-// When compiling to web using trunk:
-#[cfg(target_arch = "wasm32")]
-pub fn render() {
-    use eframe::wasm_bindgen::JsCast as _;
-
-    // Enable logs to the browser console:
-    eframe::WebLogger::init(log::LevelFilter::Debug).ok(); // TODO this doesnt work
-
-    let web_options = eframe::WebOptions::default();
-
-    let sinusoid_signal = Sinusoid::new(440.0, 1.0, 0.0, f64::sin);
-
-    let x_times = vec![
-        Duration::from_secs_f64(0.0),
-        Duration::from_secs_f64(0.25),
-        Duration::from_secs_f64(0.5),
-        Duration::from_secs_f64(0.75),
-    ];
-    let y_air_pressures = sinusoid_signal.evaluate(&x_times);
-    wasm_bindgen_futures::spawn_local(async move {
-        // gui
-
-        let mut plot_points: Vec<PlotPoint> = Vec::with_capacity(x_times.len());
-
-        for i in 0..x_times.len() {
-            let x = x_times[i].as_secs_f64();
-            let y = y_air_pressures[i];
-            plot_points.push(PlotPoint::new(x, y));
-        }
-        // TODO use proper logging
-        web_sys::console::log_1(&eframe::wasm_bindgen::JsValue::from_str(&format!(
-            "{:?}",
-            plot_points
-        )));
-
-        let document = web_sys::window()
-            .expect("No window")
-            .document()
-            .expect("No document");
-
-        let canvas = document
-            .get_element_by_id("the_canvas_id")
-            .expect("Failed to find the_canvas_id")
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .expect("the_canvas_id was not a HtmlCanvasElement");
-
-        let start_result = eframe::WebRunner::new()
-            .start(
-                canvas,
-                web_options,
-                Box::new(|_| Ok(Box::new(MyPlot { plot_points }))),
-            )
-            .await;
-
-        // Remove the loading text and spinner:
-        if let Some(loading_text) = document.get_element_by_id("loading_text") {
-            match start_result {
-                Ok(_) => {
-                    loading_text.remove();
-                }
-                Err(e) => {
-                    loading_text.set_inner_html(
-                        "<p> The app has crashed. See the developer console for details. </p>",
-                    );
-                    panic!("Failed to start eframe: {e:?}");
-                }
-            }
-        }
-    });
 }

@@ -7,17 +7,5 @@ edition = "2024"
 eframe = "0.32"       # motor base de egui para apps nativas
 egui = "0.32"
 egui_plot = "0.33"
-
-# Solo para web (logs y mejor manejo de panics en consola)
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-console_error_panic_hook = "0.1"
-console_log = "1"
-log = "0.4"
-wasm-bindgen-futures = "0.4.50"
-web-sys = "0.3.70"              # to access the DOM (to hide the loading text)
-
-# Solo para nativo (tu logger actual)
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
 log = "0.4"

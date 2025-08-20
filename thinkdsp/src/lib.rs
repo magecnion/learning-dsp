@@ -13,7 +13,7 @@ pub struct Wave {
 
 impl Wave {
     pub fn plot(&self) {
-        render::render();
+        render::render(self.times.clone(), self.samples.clone());
     }
 
     pub fn len(&self) -> usize {

@@ -1,5 +1,6 @@
 use thinkdsp::{Signal, Sinusoid};
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     println!("Plots three periods of a mix of consines");
 
@@ -12,4 +13,6 @@ fn main() {
     println!("Number of samples {}", wave.len());
     println!("Timestep in ms {}", 1000.0 / wave.framerate as f64);
     assert_eq!(wave.len(), wave.framerate as usize);
+
+    wave.plot();
 }
