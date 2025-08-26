@@ -2,6 +2,7 @@ mod render;
 use std::{
     f64::consts::TAU,
     ops::Add,
+    path::Path,
     time::{self, Duration},
 };
 
@@ -19,22 +20,38 @@ impl Wave {
     pub fn len(&self) -> usize {
         self.samples.len()
     }
+
+    // TODO: impl From fundsp::Wave to my Wave
+    pub fn new_wave_from_file<P: AsRef<Path>>(path: P) -> Result<Wave, Box<dyn std::error::Error>> {
+        // TODO return proper error
+        let fundsp_wave = fundsp::wave::Wave::load(path)?;
+        let framerate = fundsp_wave.sample_rate() as u64;
+        let n_samples = fundsp_wave.len();
+
+        let mut samples = Vec::<Sample>::with_capacity(n_samples);
+        for &sample in fundsp_wave.channel(0) {
+            samples.push(sample as Sample);
+        }
+
+        let mut times = Vec::with_capacity(n_samples);
+        for i in 0..n_samples {
+            times.push(Duration::from_secs_f64(i as f64 / framerate as f64));
+        }
+
+        Ok(Wave {
+            times,
+            samples,
+            framerate,
+        })
+    }
 }
 
 pub trait Signal {
     fn evaluate(&self, ts: &Vec<time::Duration>) -> Vec<Sample>;
 
-    fn plot(&self, framerate: u64) {
-        self.make_wave(
-            Duration::from_secs_f64(0.0),
-            Duration::from_secs_f64(0.0),
-            framerate,
-        )
-        .plot();
-    }
-
     fn period(&self) -> time::Duration;
 
+    // TODO create a new fn in Wave struct: fn new_wave_from_signal(s: Signal) -> Wave { ... }
     fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
         let samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
         let times: Vec<Duration> = (0..samples)
