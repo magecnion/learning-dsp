@@ -6,4 +6,7 @@ fn main() {
 
     let wave = Wave::new_wave_from_file(path).unwrap();
     println!("Number of samples {}", wave.len());
+    println!("Timestep in ms {}", 1000.0 / wave.framerate as f64);
+    println!("frame/sample rate {}", wave.framerate);
+    wave.plot();
 }

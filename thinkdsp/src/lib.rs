@@ -7,7 +7,7 @@ use std::{
 };
 
 pub struct Wave {
-    times: Vec<Duration>,
+    times: Vec<Duration>, // TODO: impl esta sugerencia: Si los archivos pueden ser largos, considera no guardar times y calcular t = i as f64 / framerate as f64 cuando lo necesites (ahorra bastante RAM) + hacer benchmark
     samples: Vec<Sample>,
     pub framerate: u64,
 }
@@ -21,15 +21,20 @@ impl Wave {
         self.samples.len()
     }
 
-    // TODO: impl From fundsp::Wave to my Wave
     pub fn new_wave_from_file<P: AsRef<Path>>(path: P) -> Result<Wave, Box<dyn std::error::Error>> {
         // TODO return proper error
         let fundsp_wave = fundsp::wave::Wave::load(path)?;
-        let framerate = fundsp_wave.sample_rate() as u64;
-        let n_samples = fundsp_wave.len();
+        Ok(fundsp_wave.into())
+    }
+}
+
+impl From<fundsp::wave::Wave> for Wave {
+    fn from(wave: fundsp::wave::Wave) -> Self {
+        let framerate = wave.sample_rate() as u64;
+        let n_samples = wave.len();
 
         let mut samples = Vec::<Sample>::with_capacity(n_samples);
-        for &sample in fundsp_wave.channel(0) {
+        for &sample in wave.channel(0) {
             samples.push(sample as Sample);
         }
 
@@ -38,11 +43,11 @@ impl Wave {
             times.push(Duration::from_secs_f64(i as f64 / framerate as f64));
         }
 
-        Ok(Wave {
+        Wave {
             times,
             samples,
             framerate,
-        })
+        }
     }
 }
 
@@ -51,7 +56,6 @@ pub trait Signal {
 
     fn period(&self) -> time::Duration;
 
-    // TODO create a new fn in Wave struct: fn new_wave_from_signal(s: Signal) -> Wave { ... }
     fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
         let samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
         let times: Vec<Duration> = (0..samples)
@@ -175,4 +179,14 @@ fn sinusoid_signal_evaluate() {
         Duration::from_secs_f64(0.75),
     ];
     assert_eq!(s.evaluate(&times), vec![0.0, 0.0, 0.0, 0.0])
+}
+
+#[test]
+fn check_framerate_for_one_sec_wave() {
+    let cosine = CosSignal::new(440.0, 1.0, 0.0);
+    let sine = SinSignal::new(880.0, 0.5, 0.0);
+
+    let sinusoid = &Sinusoid::from(cosine) + &Sinusoid::from(sine);
+    let wave = sinusoid.make_wave(Duration::from_secs(1), Duration::from_secs(0), 11025);
+    assert_eq!(wave.len(), wave.framerate as usize);
 }
