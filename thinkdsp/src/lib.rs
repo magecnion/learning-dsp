@@ -1,4 +1,6 @@
 mod render;
+use fundsp::hacker32::*;
+use fundsp::wave::Wave as FundspWave;
 use std::{
     f64::consts::TAU,
     ops::Add,
@@ -6,6 +8,7 @@ use std::{
     time::{self, Duration},
 };
 
+#[derive(Debug)]
 pub struct Wave {
     times: Vec<Duration>, // TODO: impl esta sugerencia: Si los archivos pueden ser largos, considera no guardar times y calcular t = i as f64 / framerate as f64 cuando lo necesites (ahorra bastante RAM) + hacer benchmark
     samples: Vec<Sample>,
@@ -51,14 +54,23 @@ impl From<fundsp::wave::Wave> for Wave {
     }
 }
 
+impl PartialEq for Wave {
+    fn eq(&self, other: &Self) -> bool {
+        other.len() == self.len()
+            && other.framerate == self.framerate
+            && other.times == self.times
+            && self.samples == other.samples
+    }
+}
+
 pub trait Signal {
     fn evaluate(&self, ts: &Vec<time::Duration>) -> Vec<Sample>;
 
     fn period(&self) -> time::Duration;
 
     fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
-        let samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
-        let times: Vec<Duration> = (0..samples)
+        let total_samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
+        let times: Vec<Duration> = (0..total_samples)
             .map(|i| Duration::from_secs_f64(start.as_secs_f64() + i as f64 / framerate as f64)) // TODO this is weird, refactor
             .collect();
         let samples = self.evaluate(&times);
@@ -154,6 +166,10 @@ impl SinSignal {
     pub fn new(freq: f64, amp: f64, offset: f64) -> Self {
         Self(Sinusoid::new(freq, amp, offset, f64::sin))
     }
+
+    fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
+        self.0.make_wave(duration, start, framerate)
+    }
 }
 
 impl From<SinSignal> for Sinusoid {
@@ -189,4 +205,81 @@ fn check_framerate_for_one_sec_wave() {
     let sinusoid = &Sinusoid::from(cosine) + &Sinusoid::from(sine);
     let wave = sinusoid.make_wave(Duration::from_secs(1), Duration::from_secs(0), 11025);
     assert_eq!(wave.len(), wave.framerate as usize);
+}
+
+#[test]
+fn compare_two_waves_same_len_different_framerate() {
+    let wave1 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(0),
+        10,
+    );
+    let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
+        Duration::from_secs(2),
+        Duration::from_secs(1),
+        5,
+    );
+    assert_eq!(wave1.len(), wave2.len());
+    assert_ne!(wave1.framerate, wave2.framerate);
+    assert_ne!(wave1, wave2);
+}
+
+#[test]
+fn compare_two_waves_same_len_and_framerate_different_times() {
+    let wave1 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(0),
+        1,
+    );
+    let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(1),
+        1,
+    );
+    assert_eq!(wave1.len(), wave2.len());
+    assert_eq!(wave1.framerate, wave2.framerate);
+    assert_ne!(wave1.times, wave2.times);
+    assert_ne!(wave1, wave2);
+}
+
+#[test]
+fn compare_two_waves_same_len_and_framerate_different_signal() {
+    let wave1 = SinSignal::new(880.0, 1.0, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(0),
+        2,
+    );
+    let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(0),
+        2,
+    );
+    assert_eq!(wave1.len(), wave2.len());
+    assert_eq!(wave1.framerate, wave2.framerate);
+    assert_eq!(wave1.times, wave2.times);
+    assert_ne!(wave1.samples, wave2.samples);
+    assert_ne!(wave1, wave2);
+}
+
+#[test]
+fn compare_sine_from_fundsp() {
+    // TODO check types
+    let amp = 0.5_f64;
+    let freq = 880.0_f64;
+    let sample_rate = 11025_u64;
+
+    let mut node = sine_hz(freq as f32) * amp as f32;
+
+    let fundsp_wave = Wave::from(FundspWave::render(sample_rate as f64, 1.0, &mut node));
+    let wave = SinSignal::new(freq, amp, 0.0).make_wave(
+        Duration::from_secs(1),
+        Duration::from_secs(0),
+        sample_rate,
+    );
+    assert_eq!(fundsp_wave.samples[0], wave.samples[0]); // TODO fix
+    assert_eq!(fundsp_wave.samples[1], wave.samples[1]);
+    assert_eq!(fundsp_wave.samples[2], wave.samples[2]);
+    assert_eq!(fundsp_wave.samples[3], wave.samples[3]);
+    assert_eq!(fundsp_wave.samples[4], wave.samples[4]);
+    assert_eq!(fundsp_wave, wave);
 }
