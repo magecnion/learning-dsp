@@ -29,6 +29,30 @@ impl Wave {
         let fundsp_wave = fundsp::wave::Wave::load(path)?;
         Ok(fundsp_wave.into())
     }
+
+    pub fn normalize(self, amp: f64) -> Self {
+        let (mut min_sample, mut max_sample) = (self.samples[0], self.samples[0]);
+
+        for &sample in self.samples.iter().skip(1) {
+            if sample < min_sample {
+                min_sample = sample;
+            } else if sample > max_sample {
+                max_sample = sample;
+            }
+        }
+
+        let max_magnitude = min_sample.abs().max(max_sample.abs());
+
+        Wave {
+            framerate: self.framerate,
+            times: self.times,
+            samples: self
+                .samples
+                .iter()
+                .map(|&sample| amp * sample / max_magnitude)
+                .collect(),
+        }
+    }
 }
 
 impl From<fundsp::wave::Wave> for Wave {
@@ -38,6 +62,7 @@ impl From<fundsp::wave::Wave> for Wave {
 
         let mut samples = Vec::<Sample>::with_capacity(n_samples);
         for &sample in wave.channel(0) {
+            // if it's in stereo, just pull out the first channel
             samples.push(sample as Sample);
         }
 

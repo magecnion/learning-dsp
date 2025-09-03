@@ -8,5 +8,6 @@ fn main() {
     println!("Number of samples {}", wave.len());
     println!("Timestep in ms {}", 1000.0 / wave.framerate as f64);
     println!("frame/sample rate {}", wave.framerate);
-    wave.plot();
+    // wave.plot();
+    wave.normalize(1.0).plot();
 }
