@@ -25,7 +25,7 @@ impl eframe::App for MyPlot {
 }
 
 // TODO be able to render several plots
-pub fn render(times: Vec<Duration>, samples: Vec<f64>) {
+pub fn render(times: Vec<Duration>, samples: Vec<f32>) {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     log::info!("Starting native…");
 

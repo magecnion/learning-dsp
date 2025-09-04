@@ -2,7 +2,7 @@ mod render;
 use fundsp::hacker32::*;
 use fundsp::wave::Wave as FundspWave;
 use std::{
-    f64::consts::TAU,
+    f32::consts::TAU,
     ops::Add,
     path::Path,
     time::{self, Duration},
@@ -10,9 +10,9 @@ use std::{
 
 #[derive(Debug)]
 pub struct Wave {
-    times: Vec<Duration>, // TODO: impl esta sugerencia: Si los archivos pueden ser largos, considera no guardar times y calcular t = i as f64 / framerate as f64 cuando lo necesites (ahorra bastante RAM) + hacer benchmark
+    times: Vec<Duration>, // TODO: impl esta sugerencia: Si los archivos pueden ser largos, considera no guardar times y calcular t = i as f32 / framerate as f32 cuando lo necesites (ahorra bastante RAM) + hacer benchmark
     samples: Vec<Sample>,
-    pub framerate: u64,
+    pub framerate: f32,
 }
 
 impl Wave {
@@ -30,7 +30,7 @@ impl Wave {
         Ok(fundsp_wave.into())
     }
 
-    pub fn normalize(self, amp: f64) -> Self {
+    pub fn normalize(self, amp: f32) -> Self {
         let (mut min_sample, mut max_sample) = (self.samples[0], self.samples[0]);
 
         for &sample in self.samples.iter().skip(1) {
@@ -57,7 +57,7 @@ impl Wave {
 
 impl From<fundsp::wave::Wave> for Wave {
     fn from(wave: fundsp::wave::Wave) -> Self {
-        let framerate = wave.sample_rate() as u64;
+        let framerate = wave.sample_rate() as f32; // TODO check this because sample_rate is returning f64
         let n_samples = wave.len();
 
         let mut samples = Vec::<Sample>::with_capacity(n_samples);
@@ -68,7 +68,7 @@ impl From<fundsp::wave::Wave> for Wave {
 
         let mut times = Vec::with_capacity(n_samples);
         for i in 0..n_samples {
-            times.push(Duration::from_secs_f64(i as f64 / framerate as f64));
+            times.push(Duration::from_secs_f32(i as f32 / framerate));
         }
 
         Wave {
@@ -79,12 +79,18 @@ impl From<fundsp::wave::Wave> for Wave {
     }
 }
 
+const EPS: f32 = 1e-3;
+
 impl PartialEq for Wave {
     fn eq(&self, other: &Self) -> bool {
         other.len() == self.len()
             && other.framerate == self.framerate
             && other.times == self.times
-            && self.samples == other.samples
+            && self
+                .samples
+                .iter()
+                .zip(other.samples.iter())
+                .all(|(a, b)| (a - b).abs() <= EPS)
     }
 }
 
@@ -93,10 +99,10 @@ pub trait Signal {
 
     fn period(&self) -> time::Duration;
 
-    fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
-        let total_samples = (duration.as_secs_f64() * framerate as f64).round() as usize;
+    fn make_wave(&self, duration: Duration, start: Duration, framerate: f32) -> Wave {
+        let total_samples = (duration.as_secs_f32() * framerate as f32).round() as usize;
         let times: Vec<Duration> = (0..total_samples)
-            .map(|i| Duration::from_secs_f64(start.as_secs_f64() + i as f64 / framerate as f64)) // TODO this is weird, refactor
+            .map(|i| Duration::from_secs_f32(start.as_secs_f32() + i as f32 / framerate as f32)) // TODO this is weird, refactor
             .collect();
         let samples = self.evaluate(&times);
 
@@ -110,10 +116,10 @@ pub trait Signal {
 
 #[derive(Clone)]
 pub struct Sinusoid {
-    freq: f64,
-    amp: f64,
-    offset: f64,
-    func: fn(f64) -> f64,
+    freq: f32,
+    amp: f32,
+    offset: f32,
+    func: fn(f32) -> f32,
 }
 
 impl Signal for Sinusoid {
@@ -121,21 +127,21 @@ impl Signal for Sinusoid {
         times
             .iter()
             .map(|&t| {
-                let phase = TAU * self.freq * t.as_secs_f64() + self.offset;
+                let phase = TAU * self.freq * t.as_secs_f32() + self.offset;
                 self.amp * (self.func)(phase)
             })
             .collect()
     }
 
     fn period(&self) -> time::Duration {
-        Duration::from_secs_f64(1.0 / self.freq)
+        Duration::from_secs_f32(1.0 / self.freq)
     }
 }
 
-type Sample = f64;
+type Sample = f32;
 
 impl Sinusoid {
-    fn new(freq: f64, amp: f64, offset: f64, func: fn(f64) -> f64) -> Sinusoid {
+    fn new(freq: f32, amp: f32, offset: f32, func: fn(f32) -> f32) -> Sinusoid {
         Sinusoid {
             freq,
             amp,
@@ -174,8 +180,8 @@ impl<'a, 'b> Add<&'b Sinusoid> for &'a Sinusoid {
 pub struct CosSignal(Sinusoid);
 
 impl CosSignal {
-    pub fn new(freq: f64, amp: f64, offset: f64) -> Self {
-        Self(Sinusoid::new(freq, amp, offset, f64::cos))
+    pub fn new(freq: f32, amp: f32, offset: f32) -> Self {
+        Self(Sinusoid::new(freq, amp, offset, f32::cos))
     }
 }
 
@@ -185,15 +191,20 @@ impl From<CosSignal> for Sinusoid {
     }
 }
 
+#[derive(Clone)]
 pub struct SinSignal(Sinusoid);
 
 impl SinSignal {
-    pub fn new(freq: f64, amp: f64, offset: f64) -> Self {
-        Self(Sinusoid::new(freq, amp, offset, f64::sin))
+    pub fn new(freq: f32, amp: f32, offset: f32) -> Self {
+        Self(Sinusoid::new(freq, amp, offset, f32::sin))
     }
 
-    fn make_wave(&self, duration: Duration, start: Duration, framerate: u64) -> Wave {
+    pub fn make_wave(&self, duration: Duration, start: Duration, framerate: f32) -> Wave {
         self.0.make_wave(duration, start, framerate)
+    }
+
+    pub fn period(&self) -> time::Duration {
+        self.0.period()
     }
 }
 
@@ -205,19 +216,19 @@ impl From<SinSignal> for Sinusoid {
 
 #[test]
 fn sinusoid_signal_period() {
-    let s = Sinusoid::new(440.0, 1.0, 0.0, f64::sin);
-    assert_eq!(s.period(), Duration::from_secs_f64(1.0 / 440.0));
+    let s = Sinusoid::new(440.0, 1.0, 0.0, f32::sin);
+    assert_eq!(s.period(), Duration::from_secs_f32(1.0 / 440.0));
 }
 
 #[test]
 // TODO more tests are needed, also check real values (maybe official rust lib for audio https://rust.audio/)
 fn sinusoid_signal_evaluate() {
-    let s = Sinusoid::new(0.0, 0.0, 0.0, f64::sin);
+    let s = Sinusoid::new(0.0, 0.0, 0.0, f32::sin);
     let times = vec![
-        Duration::from_secs_f64(0.0),
-        Duration::from_secs_f64(0.25),
-        Duration::from_secs_f64(0.5),
-        Duration::from_secs_f64(0.75),
+        Duration::from_secs_f32(0.0),
+        Duration::from_secs_f32(0.25),
+        Duration::from_secs_f32(0.5),
+        Duration::from_secs_f32(0.75),
     ];
     assert_eq!(s.evaluate(&times), vec![0.0, 0.0, 0.0, 0.0])
 }
@@ -228,7 +239,7 @@ fn check_framerate_for_one_sec_wave() {
     let sine = SinSignal::new(880.0, 0.5, 0.0);
 
     let sinusoid = &Sinusoid::from(cosine) + &Sinusoid::from(sine);
-    let wave = sinusoid.make_wave(Duration::from_secs(1), Duration::from_secs(0), 11025);
+    let wave = sinusoid.make_wave(Duration::from_secs(1), Duration::from_secs(0), 11025.0);
     assert_eq!(wave.len(), wave.framerate as usize);
 }
 
@@ -237,12 +248,12 @@ fn compare_two_waves_same_len_different_framerate() {
     let wave1 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
         Duration::from_secs(1),
         Duration::from_secs(0),
-        10,
+        10.0,
     );
     let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
         Duration::from_secs(2),
         Duration::from_secs(1),
-        5,
+        5.0,
     );
     assert_eq!(wave1.len(), wave2.len());
     assert_ne!(wave1.framerate, wave2.framerate);
@@ -254,12 +265,12 @@ fn compare_two_waves_same_len_and_framerate_different_times() {
     let wave1 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
         Duration::from_secs(1),
         Duration::from_secs(0),
-        1,
+        1.0,
     );
     let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
         Duration::from_secs(1),
         Duration::from_secs(1),
-        1,
+        1.0,
     );
     assert_eq!(wave1.len(), wave2.len());
     assert_eq!(wave1.framerate, wave2.framerate);
@@ -272,12 +283,12 @@ fn compare_two_waves_same_len_and_framerate_different_signal() {
     let wave1 = SinSignal::new(880.0, 1.0, 0.0).make_wave(
         Duration::from_secs(1),
         Duration::from_secs(0),
-        2,
+        2.0,
     );
     let wave2 = SinSignal::new(880.0, 0.5, 0.0).make_wave(
         Duration::from_secs(1),
         Duration::from_secs(0),
-        2,
+        2.0,
     );
     assert_eq!(wave1.len(), wave2.len());
     assert_eq!(wave1.framerate, wave2.framerate);
@@ -288,23 +299,37 @@ fn compare_two_waves_same_len_and_framerate_different_signal() {
 
 #[test]
 fn compare_sine_from_fundsp() {
-    // TODO check types
-    let amp = 0.5_f64;
-    let freq = 880.0_f64;
-    let sample_rate = 11025_u64;
+    let amp = 0.5_f32;
+    let freq = 880.0_f32;
+    let sample_rate = 11025.0_f32;
+    let duration = 1.0_f32;
+    let start = 0.0_f32;
 
-    let mut node = sine_hz(freq as f32) * amp as f32;
+    let mut node = constant(freq) >> sine_phase(0.0) * amp;
+    let fundsp_wave = Wave::from(FundspWave::render(
+        sample_rate as f64, // TODO this is weird
+        duration as f64,    // TODO this is weird
+        &mut node,
+    ));
 
-    let fundsp_wave = Wave::from(FundspWave::render(sample_rate as f64, 1.0, &mut node));
     let wave = SinSignal::new(freq, amp, 0.0).make_wave(
-        Duration::from_secs(1),
-        Duration::from_secs(0),
+        Duration::from_secs_f32(duration),
+        Duration::from_secs_f32(start),
         sample_rate,
     );
-    assert_eq!(fundsp_wave.samples[0], wave.samples[0]); // TODO fix
-    assert_eq!(fundsp_wave.samples[1], wave.samples[1]);
-    assert_eq!(fundsp_wave.samples[2], wave.samples[2]);
-    assert_eq!(fundsp_wave.samples[3], wave.samples[3]);
-    assert_eq!(fundsp_wave.samples[4], wave.samples[4]);
+
+    // debugging purpose so you can check how much is the epsilon
+    for i in 0..fundsp_wave.len() {
+        let (a_time, a_sample) = (fundsp_wave.times[i].as_secs_f32(), fundsp_wave.samples[i]);
+        let (b_time, b_sample) = (wave.times[i].as_secs_f32(), wave.samples[i]);
+        assert!(
+            (a_sample.abs() - b_sample.abs()) < EPS,
+            "Mismatch at sample {i}: fundsp={a_sample}, custom={b_sample}"
+        );
+        assert!(
+            (a_time.abs() - b_time.abs()) < EPS,
+            "Mismatch at sample {i}: fundsp={a_time}, custom={b_time}"
+        );
+    }
     assert_eq!(fundsp_wave, wave);
 }

@@ -9,8 +9,8 @@ fn main() {
     let cosine = thinkdsp::CosSignal::new(440.0, 1.0, 0.0);
     let sine = thinkdsp::SinSignal::new(880.0, 0.5, 0.0);
     let sinusoid = &Sinusoid::from(cosine) + &Sinusoid::from(sine);
+    let framerate = 11025.0;
 
-    let framerate = 11025;
     let wave = sinusoid.make_wave(Duration::from_secs(1), Duration::from_secs(0), framerate);
 
     println!("Number of samples {}", wave.len());
