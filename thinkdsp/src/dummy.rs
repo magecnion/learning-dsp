@@ -1,5 +1,6 @@
 //! This module contains the dummy implementation of the ThinkDSP library.
 //! It served as starting point to implement the library in Rust.
+//! Common tests can be found in the `tests` module - all implementations must pass them.
 
 #![allow(unused)]
 use std::ops::Add;
