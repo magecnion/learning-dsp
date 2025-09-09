@@ -1,6 +1,5 @@
 use eframe::egui;
 use egui_plot::{Legend, Line, Plot, PlotPoint, PlotPoints};
-use std::time::Duration;
 
 // TODO: render in the browser with WASM
 // start from this removed code: https://github.com/magecnion/learning-dsp/commit/655f0b178502eb2562586b8713653eaa0082a192
@@ -24,7 +23,7 @@ impl eframe::App for MyPlot {
     }
 }
 
-pub fn render(times: Vec<Duration>, samples: Vec<f64>) {
+pub fn render(times: Vec<f32>, samples: Vec<f32>) {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     log::info!("Starting native…");
 
@@ -35,7 +34,7 @@ pub fn render(times: Vec<Duration>, samples: Vec<f64>) {
 
     let mut plot_points: Vec<PlotPoint> = Vec::with_capacity(times.len());
     for i in 0..times.len() {
-        let x = times[i].as_secs_f64();
+        let x = times[i];
         let y = samples[i];
         plot_points.push(PlotPoint::new(x, y));
     }
