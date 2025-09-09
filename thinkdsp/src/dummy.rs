@@ -188,3 +188,14 @@ impl<T: Signal> Signal for SumSignal<T> {
         unimplemented!()
     }
 }
+
+/// Reads a wave file.
+///
+/// # Arguments
+/// * `filename` - The name of the wave file.
+///
+/// # Returns
+/// * `Wave` - The read wave.
+pub fn read_wave(filename: &str) -> Wave {
+    unimplemented!()
+}
