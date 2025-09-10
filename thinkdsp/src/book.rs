@@ -4,7 +4,7 @@
 #![allow(unused)]
 use std::{f32::consts::TAU, ops::Add};
 
-use crate::render;
+use crate::gui;
 
 /// Represents a time-varying signal.
 pub trait Signal {
@@ -25,9 +25,9 @@ pub trait Signal {
     ///
     /// # Arguments
     /// * `framerate` - The number of samples per second.
-    fn plot(&self, framerate: u64) {
+    fn plot(&self, framerate: u64, filename: Option<String>) {
         let duration = self.period() * 3.0;
-        self.make_wave(duration, 0.0, framerate).plot();
+        self.make_wave(duration, 0.0, framerate).plot(filename);
     }
 
     /// Evaluates the signal at the given times.
@@ -84,8 +84,10 @@ impl Wave {
     }
 
     /// Plots the wave.
-    pub fn plot(&self) {
-        render::render(self.ts.clone(), self.ys.clone());
+    pub fn plot(&self, filename: Option<String>) {
+        if let Err(e) = gui::draw(filename, self.ts.clone(), self.ys.clone()) {
+            log::error!("Failed to plot wave: {}", e);
+        }
     }
 
     /// Returns the length of the wave.
@@ -98,6 +100,7 @@ impl Wave {
 }
 
 /// Represents a sinusoidal signal.
+#[derive(Clone)]
 pub struct Sinusoid {
     freq: f32,
     amp: f32,
@@ -154,6 +157,7 @@ impl Add for Sinusoid {
 }
 
 /// Represents a cosine sinusoid.
+#[derive(Clone)]
 pub struct CosSignal(Sinusoid);
 
 impl CosSignal {
@@ -178,6 +182,7 @@ impl From<CosSignal> for Sinusoid {
 }
 
 /// Represents a sine sinusoid.
+#[derive(Clone)]
 pub struct SinSignal(Sinusoid);
 
 impl SinSignal {
