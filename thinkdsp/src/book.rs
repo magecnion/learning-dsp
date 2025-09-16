@@ -64,8 +64,8 @@ pub trait Signal {
 
 /// Represents a discrete-time waveform.
 pub struct Wave {
-    ys: Vec<f32>,
-    ts: Vec<f32>,
+    pub ys: Vec<f32>, // TODO refactor I'm not convinced about making these public
+    pub ts: Vec<f32>, // TODO refactor I'm not convinced about making these public
     pub framerate: u64,
 }
 
