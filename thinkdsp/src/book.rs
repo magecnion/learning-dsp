@@ -63,6 +63,7 @@ pub trait Signal {
 }
 
 /// Represents a discrete-time waveform.
+#[derive(Clone)]
 pub struct Wave {
     pub ys: Vec<f32>, // TODO refactor I'm not convinced about making these public
     pub ts: Vec<f32>, // TODO refactor I'm not convinced about making these public
@@ -96,6 +97,46 @@ impl Wave {
     /// * `usize` - Length of samples array.
     pub fn len(&self) -> usize {
         self.ys.len()
+    }
+
+    /// Tapers the amplitude at the beginning and end of the signal.
+    ///
+    /// Tapers either the given duration of time or the given
+    /// fraction of the total duration, whichever is less.
+    ///
+    /// # Arguments
+    /// * `denom` - The fraction of the segment to taper.
+    /// * `duration` - The duration of the taper in seconds.
+    ///
+    /// # Returns
+    /// * `Wave` - The tapered wave.
+    pub fn apodize(&self, denom: f32, duration: f32) -> Self {
+        let n = self.ys.len() as f32;
+        let k1 = n / denom;
+        let k2 = duration * self.framerate as f32;
+        let k = k1.min(k2);
+
+        let w1: ndarray::Array1<f32> = ndarray::Array::linspace(0.0, 1.0, k as usize);
+        let w2: ndarray::Array1<f32> = ndarray::Array::ones(n as usize - 2 * k as usize);
+        let w3: ndarray::Array1<f32> = ndarray::Array::linspace(1.0, 0.0, k as usize);
+
+        // Build the window array step by step to avoid shape issues
+        let mut window = Vec::with_capacity(n as usize);
+        window.extend(w1.iter().map(|&x| x));
+        window.extend(w2.iter().map(|&x| x));
+        window.extend(w3.iter().map(|&x| x));
+
+        let ys = self
+            .ys
+            .iter()
+            .zip(window.iter())
+            .map(|(y, w)| y * w)
+            .collect();
+        Self {
+            ys,
+            ts: self.ts.clone(),
+            framerate: self.framerate,
+        }
     }
 }
 

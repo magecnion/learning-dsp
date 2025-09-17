@@ -80,6 +80,21 @@ impl Wave {
     pub fn len(&self) -> usize {
         self.ys.len()
     }
+
+    /// Tapers the amplitude at the beginning and end of the signal.
+    ///
+    /// Tapers either the given duration of time or the given
+    /// fraction of the total duration, whichever is less.
+    ///
+    /// # Arguments
+    /// * `denom` - The fraction of the segment to taper.
+    /// * `duration` - The duration of the taper in seconds.
+    ///
+    /// # Returns
+    /// * `Wave` - The tapered wave.
+    pub fn apodize(&self, denom: f32, duration: f32) -> Self {
+        unimplemented!()
+    }
 }
 
 /// Represents a sinusoidal signal.

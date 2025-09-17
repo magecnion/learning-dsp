@@ -32,9 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("number of samples {}", wave.len());
     log::info!("timestep in ms {}", 1.0 / wave.framerate as f64 * 1000.0);
 
+    let wave = wave.apodize(20.0, 0.1);
+    wave.plot(Some("apodized".to_string()));
+
     let stream_handle = OutputStreamBuilder::open_default_stream()?;
     let sink = rodio::Sink::connect_new(&stream_handle.mixer());
-    sink.append(thinkdsp::rodio::Wave::from(wave));
+    sink.append(thinkdsp::rodio::Wave::from(wave.clone()));
     sink.sleep_until_end();
 
     Ok(())
